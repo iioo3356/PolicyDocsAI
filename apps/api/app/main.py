@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from .analysis.pipeline import run_analysis
@@ -44,6 +44,33 @@ def startup() -> None:
             if enum_exists:
                 connection.exec_driver_sql("ALTER TYPE sourcekind ADD VALUE IF NOT EXISTS 'XLSX'")
     Base.metadata.create_all(engine)
+    _recover_interrupted_analysis_jobs()
+
+
+def _recover_interrupted_analysis_jobs() -> None:
+    """In-process background jobs cannot survive an API process restart."""
+    interrupted = {JobStatus.PENDING, JobStatus.PROCESSING}
+    message = "API가 재시작되어 분석이 중단되었습니다. Source를 삭제한 뒤 다시 업로드하세요."
+    with Session(engine) as db:
+        source_count = db.execute(
+            update(Source).where(Source.status.in_(interrupted)).values(
+                status=JobStatus.FAILED,
+                error_message=message,
+            )
+        ).rowcount
+        job_count = db.execute(
+            update(AnalysisJob).where(AnalysisJob.status.in_(interrupted)).values(
+                status=JobStatus.FAILED,
+                stage="failed",
+                error_message=message,
+                completed_at=datetime.utcnow(),
+            )
+        ).rowcount
+        db.commit()
+    if source_count or job_count:
+        logging.getLogger("uvicorn.error").warning(
+            "Recovered interrupted analysis state sources=%s jobs=%s", source_count, job_count,
+        )
 
 
 def require_project(db: Session, project_id: str) -> Project:

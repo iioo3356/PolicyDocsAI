@@ -36,7 +36,7 @@ if (order.status === "SHIPPED") {
 
 ## 코드 분석 방식
 
-React와 Next.js 프로젝트는 ZIP 안의 모든 파일을 분석하지 않습니다. 실제 화면에서 사용하는 코드만 보기 위해 route entry에서 import 관계를 따라갑니다.
+React와 Next.js 프로젝트는 ZIP 안의 모든 파일을 분석하지 않습니다. 실제 화면에서 사용하는 코드만 보기 위해 route entry에서 import 관계를 따라갑니다. TypeScript, TSX, JavaScript, JSX 문법은 `tree-sitter` AST로 파싱하며 일반 import뿐 아니라 재수출(`export ... from`), 동적 `import()`, `require()`도 추적합니다.
 
 ```text
 Route entry
@@ -86,7 +86,7 @@ Source 업로드
 | 영역 | 기술 |
 | --- | --- |
 | Web | Next.js 15, React 19, TypeScript, TanStack Query |
-| API | FastAPI, Python 3.11+, SQLAlchemy, Pydantic |
+| API | FastAPI, Python 3.11+, SQLAlchemy, Pydantic, tree-sitter |
 | AI | LiteLLM, 기본 모델 `gemini/gemini-3.1-flash-lite` |
 | DB | PostgreSQL 16, pgvector; 로컬 SQLite fallback |
 | 실행 | Docker Compose |
@@ -287,7 +287,7 @@ make test
 
 ## 현재 제한
 
-- TypeScript/JavaScript import 분석은 정적·동적 import 문자열 기반이며 완전한 AST 분석은 아닙니다.
+- TypeScript/JavaScript import 관계는 tree-sitter AST로 분석하지만 타입과 런타임 값까지 해석하는 의미 분석은 아닙니다.
 - 런타임에 계산되는 import 경로와 복잡한 alias 설정은 놓칠 수 있습니다.
 - Kotlin은 호출 그래프가 아니라 정책 키워드 주변 구간을 분석합니다.
 - 자동 정책 병합과 자연어 conflict 판정은 제공하지 않습니다.

@@ -42,3 +42,35 @@ def test_non_react_archive_keeps_existing_all_code_behavior():
 
     assert selected == documents
     assert stats["mode"] == "all-code-fallback"
+
+
+def test_ast_follows_reexports_dynamic_imports_and_require_calls():
+    documents = [
+        ("src/app/page.tsx", b"export { PolicyView } from '../features'"),
+        ("src/features/index.ts", b"export * from './PolicyView'"),
+        ("src/features/PolicyView.tsx", b"const rules = import('./rules')\nconst legacy = require('./legacy')"),
+        ("src/features/rules.ts", b"export const minimumAge = 19"),
+        ("src/features/legacy.js", b"exports.enabled = true"),
+        ("src/features/unused.ts", b"export const unused = true"),
+    ]
+
+    selected, _ = select_reachable_react_files(documents)
+
+    assert paths(selected) == [
+        "src/app/page.tsx",
+        "src/features/PolicyView.tsx",
+        "src/features/index.ts",
+        "src/features/legacy.js",
+        "src/features/rules.ts",
+    ]
+
+
+def test_ast_does_not_treat_import_like_text_as_a_dependency():
+    documents = [
+        ("src/pages/home.tsx", b"export const example = './unused'\nconst docs = \"import('./unused')\""),
+        ("src/components/unused.tsx", b"export const secret = true"),
+    ]
+
+    selected, _ = select_reachable_react_files(documents)
+
+    assert paths(selected) == ["src/pages/home.tsx"]

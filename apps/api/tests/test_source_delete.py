@@ -73,3 +73,24 @@ def test_delete_source_preserves_approved_policy_evidence(tmp_path, monkeypatch)
 
         assert error.value.status_code == 409
         assert db.get(Source, source.id) is not None
+
+
+def test_startup_recovery_marks_interrupted_analysis_as_failed(monkeypatch):
+    engine = database()
+    monkeypatch.setattr(main, "engine", engine)
+    with Session(engine) as db:
+        source, _ = source_graph(db, "project/code.zip")
+        source.status = JobStatus.PROCESSING
+        job = db.scalar(select(AnalysisJob).where(AnalysisJob.source_id == source.id))
+        job.status = JobStatus.PROCESSING
+        db.commit()
+        source_id, job_id = source.id, job.id
+
+    main._recover_interrupted_analysis_jobs()
+
+    with Session(engine) as db:
+        source, job = db.get(Source, source_id), db.get(AnalysisJob, job_id)
+        assert source.status == JobStatus.FAILED
+        assert job.status == JobStatus.FAILED
+        assert "재시작" in source.error_message
+        assert job.completed_at is not None

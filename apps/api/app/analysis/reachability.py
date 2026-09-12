@@ -2,6 +2,9 @@ import posixpath
 import re
 from collections import deque
 
+from tree_sitter import Node
+from tree_sitter_language_pack import get_parser
+
 
 CODE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx")
 CONFIG_NAMES = {
@@ -15,6 +18,12 @@ IMPORT_PATTERN = re.compile(
     r"(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?[\"']([^\"']+)[\"']"
     r"|(?:import|require)\s*\(\s*[\"']([^\"']+)[\"']\s*\)"
 )
+LANGUAGE_BY_EXTENSION = {
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".js": "javascript",
+    ".jsx": "javascript",
+}
 
 
 def _is_config_file(path: str) -> bool:
@@ -61,6 +70,69 @@ def _resolve_import(importer: str, specifier: str, available: set[str]) -> str |
     return next((candidate for candidate in candidates if candidate in available), None)
 
 
+def _node_text(node: Node, source: bytes) -> str:
+    return source[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+
+
+def _string_value(node: Node, source: bytes) -> str | None:
+    if node.type not in {"string", "string_fragment"}:
+        return None
+    value = _node_text(node, source)
+    if node.type == "string" and len(value) >= 2 and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _first_string(node: Node, source: bytes) -> str | None:
+    pending = [node]
+    while pending:
+        current = pending.pop()
+        value = _string_value(current, source)
+        if value is not None:
+            return value
+        pending.extend(reversed(current.children))
+    return None
+
+
+def _call_name(node: Node, source: bytes) -> str:
+    function = node.child_by_field_name("function")
+    return _node_text(function, source) if function else ""
+
+
+def _ast_imports(path: str, source: bytes) -> set[str]:
+    """Extract static imports, re-exports, require(), and import() using tree-sitter."""
+    extension = posixpath.splitext(path)[1].lower()
+    parser = get_parser(LANGUAGE_BY_EXTENSION[extension])
+    root = parser.parse(source).root_node
+    imports: set[str] = set()
+    pending = [root]
+
+    while pending:
+        node = pending.pop()
+        if node.type in {"import_statement", "export_statement"}:
+            source_node = node.child_by_field_name("source")
+            specifier = _string_value(source_node, source) if source_node else None
+            if specifier:
+                imports.add(specifier)
+        elif node.type == "call_expression" and _call_name(node, source) in {"require", "import"}:
+            arguments = node.child_by_field_name("arguments")
+            specifier = _first_string(arguments, source) if arguments else None
+            if specifier:
+                imports.add(specifier)
+        pending.extend(reversed(node.children))
+
+    return imports
+
+
+def _import_specifiers(path: str, source: bytes) -> set[str]:
+    try:
+        return _ast_imports(path, source)
+    except Exception:
+        # A malformed/unsupported source file must not abort the whole analysis job.
+        text = source.decode("utf-8", errors="replace")
+        return {match.group(1) or match.group(2) for match in IMPORT_PATTERN.finditer(text)}
+
+
 def select_reachable_react_files(documents: list[tuple[str, bytes]]) -> tuple[list[tuple[str, bytes]], dict]:
     """Keep route-reachable React files; fall back to all files when no React route entry exists."""
     normalized = [(posixpath.normpath(path.replace("\\", "/")).lstrip("./"), raw) for path, raw in documents]
@@ -77,9 +149,8 @@ def select_reachable_react_files(documents: list[tuple[str, bytes]]) -> tuple[li
         if path in reachable or _is_config_file(path):
             continue
         reachable.add(path)
-        text = by_path[path].decode("utf-8", errors="replace")
-        for match in IMPORT_PATTERN.finditer(text):
-            dependency = _resolve_import(path, match.group(1) or match.group(2), available)
+        for specifier in _import_specifiers(path, by_path[path]):
+            dependency = _resolve_import(path, specifier, available)
             if dependency and dependency not in reachable and not _is_config_file(dependency):
                 queue.append(dependency)
 
