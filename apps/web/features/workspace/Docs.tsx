@@ -13,7 +13,7 @@ export function Docs({ id, projectName }: { id: string; projectName: string }) {
   const [selected, setSelected] = useState<string>();
   const query = useQuery({
     queryKey: ["policies", id],
-    queryFn: () => api<Policy[]>(`/projects/${id}/policies?status=APPROVED`),
+    queryFn: () => api<Policy[]>(`/projects/${id}/policies`),
   });
   const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const policies = (query.data ?? []).filter(policy => {

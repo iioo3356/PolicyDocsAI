@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models import AnalysisJob, JobStatus, PolicyCandidate, Source, SourceChunk, SourceFile
-from app.application.source_versions import suggest_policy
+from app.application.source_versions import deprecate_missing_policies, suggest_policy
 from .extractor import extract_candidate_with_metadata
 from .parsers import parse_code, parse_csv, parse_markdown, parse_xlsx
 from .reachability import select_reachable_react_files
@@ -140,6 +140,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
                                file_count, chunk_count,
                                candidate_count, ai_count, fallback_count)
             db.commit()
+        deprecated = deprecate_missing_policies(db, source)
         source.discovered_policy_count = candidate_count
         source.status = job.status = JobStatus.COMPLETED
         job.stage, job.progress = "completed", 100
@@ -148,8 +149,8 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
         job.completed_at = utc_now_naive()
         db.commit()
         logger.info(
-            "Source analysis completed source_id=%s files=%s chunks=%s candidates=%s ai_candidates=%s fallback_candidates=%s",
-            source.id, file_count, chunk_count, candidate_count, ai_count, fallback_count,
+            "Source analysis completed source_id=%s files=%s chunks=%s candidates=%s deprecated=%s ai_candidates=%s fallback_candidates=%s",
+            source.id, file_count, chunk_count, candidate_count, len(deprecated), ai_count, fallback_count,
         )
     except Exception as exc:
         logger.exception("Source analysis failed source_id=%s error_type=%s", source.id, type(exc).__name__)

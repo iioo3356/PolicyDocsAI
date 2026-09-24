@@ -17,3 +17,4 @@ class PolicyOut(ORMModel):
     evidence: list[EvidenceOut]
     created_at: datetime
     updated_at: datetime
+    deprecated_at: datetime | None

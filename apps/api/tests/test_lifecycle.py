@@ -9,6 +9,7 @@ from app import main
 from app.domain.clock import utc_now_naive
 from app.infrastructure.models import AnalysisJob, JobStatus, Project, Source, SourceKind
 from app.infrastructure.models.defaults import now
+from app.infrastructure.schema import ensure_policy_deprecated_at_column
 
 
 def test_clock_keeps_naive_utc_storage_contract():
@@ -18,6 +19,18 @@ def test_clock_keeps_naive_utc_storage_contract():
     assert current.tzinfo is None
     assert model_default.tzinfo is None
     assert before <= current <= model_default <= after
+
+
+def test_existing_policy_table_gets_deprecated_at_column():
+    engine = create_engine('sqlite://')
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql('CREATE TABLE policies (id VARCHAR(36) PRIMARY KEY)')
+        ensure_policy_deprecated_at_column(engine)
+        ensure_policy_deprecated_at_column(engine)
+        assert 'deprecated_at' in {column['name'] for column in inspect(engine).get_columns('policies')}
+    finally:
+        engine.dispose()
 
 
 def test_lifespan_initializes_storage_and_recovers_interrupted_jobs(tmp_path, monkeypatch):

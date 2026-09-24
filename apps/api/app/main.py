@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import Base, engine
 from app.infrastructure.models import AnalysisJob, JobStatus, Source
+from app.infrastructure.schema import ensure_policy_deprecated_at_column
 from fastapi.responses import JSONResponse
 from app.domain.application_error import ApplicationError
 from app.presentation.routes import projects, sources, candidates, policies, chat
@@ -43,6 +44,7 @@ def startup() -> None:
             if enum_exists:
                 connection.exec_driver_sql("ALTER TYPE sourcekind ADD VALUE IF NOT EXISTS 'XLSX'")
     Base.metadata.create_all(engine)
+    ensure_policy_deprecated_at_column(engine)
     _recover_interrupted_analysis_jobs()
 
 def _recover_interrupted_analysis_jobs() -> None:

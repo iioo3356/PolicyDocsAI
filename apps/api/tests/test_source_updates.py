@@ -94,9 +94,45 @@ def test_unmatched_location_requires_manual_policy_mapping(client):
     updated = replacement(client, project_id, source, '# 새 취소 기준\n승인 후 7일 내 취소할 수 있습니다.')
     candidate = candidates(client, project_id, updated)[0]
     assert candidate['proposed_policy_id'] is None
+    deprecated = client.get(f'/policies/{policy["id"]}').json()
+    assert deprecated['status'] == 'DEPRECATED'
+    assert deprecated['deprecated_at'] is not None
     response = client.post(f'/policy-candidates/{candidate["id"]}/approve', json={**UPDATED, 'target_policy_id': policy['id']})
     assert response.status_code == 200, response.text
     assert response.json()['id'] == policy['id']
+    assert response.json()['status'] == 'APPROVED'
+    assert response.json()['deprecated_at'] is None
+
+
+def test_missing_policy_is_deprecated_with_date_and_history(client):
+    project_id = project(client)
+    original = client.post(
+        f'/projects/{project_id}/sources', data={'role': 'document'},
+        files={'file': ('policies.md', '# 취소\n승인 전 취소 가능\n# 환불\n구매 후 환불 가능', 'text/markdown')},
+    ).json()['id']
+    original_candidates = candidates(client, project_id, original)
+    assert len(original_candidates) == 2
+    approved = {}
+    for candidate in original_candidates:
+        title = '취소 정책' if '취소' in candidate['title'] else '환불 정책'
+        approved[title] = client.post(f'/policy-candidates/{candidate["id"]}/approve', json={
+            'title': title, 'summary': candidate['summary'], 'rules': candidate['rules'],
+        }).json()
+
+    replacement(client, project_id, original, '# 취소\n승인 전 취소 가능')
+    current = {policy['title']: policy for policy in client.get(f'/projects/{project_id}/policies').json()}
+    assert current['취소 정책']['status'] == 'APPROVED'
+    retired = current['환불 정책']
+    assert retired['status'] == 'DEPRECATED'
+    assert retired['deprecated_at'] is not None
+    assert [policy['id'] for policy in client.get(
+        f'/projects/{project_id}/policies?status=APPROVED').json()
+    ] == [approved['취소 정책']['id']]
+    history = client.get(f'/policies/{retired["id"]}/revisions').json()
+    assert history[0]['after']['_deprecation']['deprecated_at'] == retired['deprecated_at']
+    assert '정책 폐기' in history[0]['instruction']
+    chat = client.post(f'/projects/{project_id}/chat', json={'question': '환불 정책'})
+    assert all(item['id'] != retired['id'] for item in chat.json()['related_policies'])
 
 
 def test_source_update_validation_and_foreign_target(client):

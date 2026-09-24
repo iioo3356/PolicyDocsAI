@@ -11,11 +11,12 @@ def apply_source_update(candidate: PolicyCandidate, payload, version: SourceVers
     target_id = payload.target_policy_id or candidate.proposed_policy_id
     policy = db.scalar(policy_query().where(Policy.id == target_id,
                        Policy.project_id == candidate.project_id).with_for_update())
-    if not policy or policy.status != PolicyStatus.APPROVED:
-        raise ApplicationError(404, '업데이트할 승인 정책을 찾을 수 없습니다.')
+    if not policy or policy.status not in {PolicyStatus.APPROVED, PolicyStatus.DEPRECATED}:
+        raise ApplicationError(404, '업데이트할 정책을 찾을 수 없습니다.')
     verify_expected(policy, version)
     before = snapshot(policy)
     policy.title, policy.summary, policy.category = payload.title, payload.summary, payload.category
+    policy.status, policy.deprecated_at = PolicyStatus.APPROVED, None
     policy.rules[:] = [PolicyRule(content=content, sort_order=index) for index, content in enumerate(payload.rules)]
     policy.updated_at = utc_now_naive()
     policy.confidence = candidate.confidence

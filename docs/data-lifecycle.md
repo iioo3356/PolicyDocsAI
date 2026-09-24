@@ -52,7 +52,7 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 ## 분석 상태와 재시작
 
 <!-- doc-check: {"kind":"enum","path":"apps/api/app/domain/job_status.py","symbol":"JobStatus","expected":{"PENDING":"PENDING","PROCESSING":"PROCESSING","COMPLETED":"COMPLETED","FAILED":"FAILED"}} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"636ef5572128b29cee930eb2d987d701869195f8f9b6ec0b772274670d8b1c58"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"21bce7db00394002f3fc9f9ac9f3c62fd72f74d7787e3e69a47d0bc833ed6b16"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/parsers.py","symbol":"parse_code","sha256":"361a7ef7446f90c5116285ae15383e1079beeadedfca3bb430d0da24bc086100"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/domain/business_policy_signal.py","symbol":"business_policy_score","sha256":"5fdc893af875767567a751824191ff57f27169764b8b7425f63ca688110582a7"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"_recover_interrupted_analysis_jobs","sha256":"f05ba3d0a351ad8934d6c4d7975aa2f45a4868cf7ab207701880825d44c76177"} -->
@@ -65,6 +65,7 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 - 파일을 처리하는 동안 현재 파일, 처리 파일 수, 전체 파일 수와 진행률을 갱신한다.
 - 후보를 찾을 때마다 제목과 누적 후보를 commit하여 소스 화면의 1초 polling에서 조회할 수 있다.
 - 분석 중 후보는 정책 관리 목록에서 제외하며 승인·병합·반려 API도 409로 거부한다.
+- 업데이트 분석 완료 직전에 새 후보와 연결되지 않은 기존 승인 정책을 폐기하고 일자·이력을 저장한다.
 - 파일·chunk·후보 처리가 끝나면 두 상태를 `COMPLETED`로 저장한다.
 - 처리 중 예외가 나면 실시간 표시를 위해 먼저 commit한 후보·chunk·파일을 삭제하고
   Source의 발견 수를 0으로 되돌린 뒤 `FAILED`와 오류를 저장한다.
@@ -91,6 +92,8 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 | 재승인·재병합 | 이미 검토한 후보이면 409 |
 | 거절 | PENDING만 REJECTED로 변경, 이미 검토되었으면 409 |
 | 소스 업데이트 승인 | 연결된 기존 정책을 전체 교체하고 search_text·근거·수정 이력을 함께 갱신 |
+| 업데이트에서 정책 누락 | 분석 완료 시 DEPRECATED와 deprecated_at을 기록하고 채팅 근거에서 제외 |
+| 폐기 정책에 후보 연결 | 정책을 APPROVED로 되돌리고 deprecated_at을 제거 |
 | 직접 정책 PATCH | 409로 소스 업데이트 안내 |
 
 병합은 기존 Policy의 제목·요약·상태를 자동 교체하지 않는다.
@@ -125,10 +128,11 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 
 ## 스키마 변경과 운영 확인
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"startup","sha256":"41f645cf31b9a95a78dc272e0e040feebb7bd94facc968b7f71155206612fc4c"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"startup","sha256":"53ce0613d5a356b8c468418db51d7e5553cb2e2320be2dde2ef3836aca9e6647"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"health","sha256":"d572cf4981264ef325ed57ddc10ee028325bac484ac12e2d21ef8960ed6d1f8e"} -->
 
-- 현재 시작 시 `Base.metadata.create_all()`을 실행하고 PostgreSQL SourceKind의 XLSX 값을 보완한다.
+- 현재 시작 시 `Base.metadata.create_all()`을 실행하고 PostgreSQL SourceKind의 XLSX 값과
+  기존 policies 테이블의 deprecated_at 컬럼을 보완한다.
 - 버전별 마이그레이션 체계는 없다. 기존 DB의 컬럼 변경이 자동 반영된다고 가정하지 않는다.
 - 스키마 변경 전 기존 데이터 변환, 배포 순서, 복구 방법을 정한다.
 - `/health`는 정적 응답이며 DB·스토리지·LLM 가용성을 검사하지 않는다.

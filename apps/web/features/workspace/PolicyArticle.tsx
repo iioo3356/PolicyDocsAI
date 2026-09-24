@@ -8,11 +8,16 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 
 export function PolicyArticle({ policy }: { policy: Policy }) {
   const history = useQuery({ queryKey: ["policy-history", policy.id], queryFn: () => api<PolicyRevision[]>(`/policies/${policy.id}/revisions`) });
-  const currentChunk = history.data?.[0]?.after._source?.source_chunk_id;
+  const currentChunk = history.data?.find(revision => revision.after._source)?.after._source?.source_chunk_id;
+  const deprecated = policy.status === "DEPRECATED";
   return (
     <article className="policy-article" key={policy.id}>
       <div className="doc-breadcrumb">Docs <span>/</span> {policy.category}</div>
-      <div className="article-status"><span className="status-dot" />승인된 정책
+      <div className={`article-status ${deprecated ? "is-deprecated" : ""}`}>
+        <span className="status-dot" />{deprecated ? "폐기된 정책" : "승인된 정책"}
+        {deprecated && policy.deprecated_at && <time dateTime={policy.deprecated_at}>
+          {new Date(`${policy.deprecated_at}Z`).toLocaleDateString("ko-KR")} 폐기
+        </time>}
         {policy.has_conflict && <span className="conflict-note">확인이 필요한 충돌이 있습니다</span>}
       </div>
       <h1>{policy.title}</h1>

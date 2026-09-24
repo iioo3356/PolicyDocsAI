@@ -19,5 +19,6 @@ class Policy(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    deprecated_at: Mapped[datetime | None] = mapped_column(DateTime)
     rules: Mapped[list["PolicyRule"]] = relationship(cascade="all, delete-orphan", order_by="PolicyRule.sort_order")
     evidence: Mapped[list["PolicyEvidence"]] = relationship(cascade="all, delete-orphan")

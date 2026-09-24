@@ -8,7 +8,7 @@
 
 ## 우선 확인: 데이터와 입력 처리
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"636ef5572128b29cee930eb2d987d701869195f8f9b6ec0b772274670d8b1c58"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"21bce7db00394002f3fc9f9ac9f3c62fd72f74d7787e3e69a47d0bc833ed6b16"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"reject_candidate","sha256":"1636c23729ec9bfcf0d26d0ef40274c7295161531b8ad946d3fdd389acbf6c1e"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"apply_review","sha256":"90a5cda18f622914819683308d930e2900aff13cd5b24d8472a8aea4bac3a205"} -->
 
@@ -25,6 +25,8 @@
 실패 시 부분 결과 삭제는 `apps/api/tests/test_analysis_progress.py`에서 검증한다.
 코드 후보는 업무 결과·제한과 분기·검증의 조합으로 사전 선별한다.
 UI 탐색·표시만 있는 코드의 제외와 업무 제한 보존은 `apps/api/tests/test_parsers.py`에서 검증한다.
+업데이트에서 사라진 정책은 분석 성공 시 폐기 일자와 이력을 남기며,
+수동 후보 연결로 다시 활성화할 수 있다. `apps/api/tests/test_source_updates.py`에서 검증한다.
 
 ## 운영 확장 전에 처리
 
@@ -32,7 +34,7 @@ UI 탐색·표시만 있는 코드의 제외와 업무 제한 보존은 `apps/ap
   다중 인스턴스를 도입하기 전 작업 소유권, 재시도, 중복 실행 방지, 복구 기준을 구현한다.
 - **비동기 업로드 경계:** async 라우터에서 동기 DB·파일 서비스를 직접 호출한다.
   실행 방식을 바꾸고 세션의 생성·종료가 같은 작업 경계에 있는지 검증한다.
-- **DB 마이그레이션:** create_all과 개별 Enum 보완만 존재한다.
+- **DB 마이그레이션:** create_all과 개별 Enum·컬럼 보완만 존재한다.
   기존 데이터가 있는 DB의 버전 전환·실패 복구 절차를 도입한다.
 - **오류 메시지 정제:** 분석 예외 문자열을 사용자에게 노출되는 오류 필드에 저장한다.
   사용자 설명과 내부 진단을 분리하고 키·내부 주소·원문이 노출되지 않는지 테스트한다.

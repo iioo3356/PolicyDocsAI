@@ -23,12 +23,13 @@ export function DocsSidebar({ policies, selectedId, onSelect, searching }: {
                 className={`topic-link ${selectedId === policy.id ? "is-active" : ""}`}
                 aria-current={selectedId === policy.id ? "page" : undefined}>
                 <WorkspaceIcon name="file" /><span>{policy.title}</span>
+                {policy.status === "DEPRECATED" && <small>폐기됨</small>}
               </button>
             ))}
           </section>
         ))}
         {policies.length === 0 && <p className="sidebar-empty">
-          {searching ? "일치하는 주제가 없습니다." : "승인된 문서가 여기에 표시됩니다."}
+          {searching ? "일치하는 주제가 없습니다." : "정책 문서가 여기에 표시됩니다."}
         </p>}
       </nav>
     </aside>
