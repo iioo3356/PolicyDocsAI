@@ -2,7 +2,7 @@ from fastapi import BackgroundTasks, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db
-from app.application.dto import JobOut, SourceOut, SourceRoleUpdate
+from app.application.dto import JobOut, SourceAnalysisOut, SourceOut, SourceRoleUpdate
 from fastapi import APIRouter
 from app.application import sources as service
 from app.infrastructure.jobs import _process_job
@@ -38,3 +38,8 @@ def delete_source(source_id: str, db: Session = Depends(get_db)) -> None:
 @router.get('/analysis-jobs/{job_id}', response_model=JobOut)
 def get_job(job_id: str, db: Session = Depends(get_db)):
     return service.get_job(job_id, db)
+
+
+@router.get('/sources/{source_id}/analysis', response_model=SourceAnalysisOut)
+def analysis_progress(source_id: str, db: Session = Depends(get_db)):
+    return service.analysis_progress(source_id, db)

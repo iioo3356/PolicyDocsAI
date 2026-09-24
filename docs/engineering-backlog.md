@@ -8,9 +8,9 @@
 
 ## 우선 확인: 데이터와 입력 처리
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"292eb7f62c3becab04160974911a73ebc9baae09eb50bc5b282496a110850f14"} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"reject_candidate","sha256":"f4dd79e5f10da01ba9ae93b920ecde3f239cd85b4ba013246028e3ae18257b5c"} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"apply_review","sha256":"3afb3e02f745cfcb66a16062cd23a8dece7714d612ca6d0270b6de47b16e635b"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"5ea2a5faba493e18061d08ca397a3014a904f66c423490c97caffe00abe74bfe"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"reject_candidate","sha256":"1636c23729ec9bfcf0d26d0ef40274c7295161531b8ad946d3fdd389acbf6c1e"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"apply_review","sha256":"90a5cda18f622914819683308d930e2900aff13cd5b24d8472a8aea4bac3a205"} -->
 
 | 과제 | 현재 근거 | 완료 기준 |
 | --- | --- | --- |
@@ -20,6 +20,9 @@
 완료: XLSX의 바이너리 건너뛰기 수정과 실제 업로드 테스트, 승인 후보 반려 방지,
 일반 승인·병합의 입력 내 규칙 중복 제거, 소스 업데이트 승인·이력 추가.
 검증: `apps/api/tests/test_source_updates.py`, `apps/api/tests/test_api_workflow.py`.
+
+분석 중 진행률과 발견 후보는 파일·후보 단위 commit과 조회 API로 제공한다.
+실패 시 부분 결과 삭제는 `apps/api/tests/test_analysis_progress.py`에서 검증한다.
 
 ## 운영 확장 전에 처리
 

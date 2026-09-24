@@ -1,7 +1,7 @@
 from app.domain.clock import utc_now_naive
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
-from app.infrastructure.models import CandidateDecision, Policy, PolicyCandidate, PolicyEvidence, PolicyRule, PolicyStatus, Source, SourceChunk, SourceVersion
+from app.infrastructure.models import CandidateDecision, JobStatus, Policy, PolicyCandidate, PolicyEvidence, PolicyRule, PolicyStatus, Source, SourceChunk, SourceVersion
 from app.application.dto import CandidateDetail, CandidateReview
 from app.domain.application_error import ApplicationError
 
@@ -28,8 +28,9 @@ def candidate_detail(candidate: PolicyCandidate, db: Session) -> CandidateDetail
 
 def list_candidates(project_id: str, decision: CandidateDecision, db: Session):
     require_project(db, project_id)
-    return db.scalars(select(PolicyCandidate).where(
-        PolicyCandidate.project_id == project_id, PolicyCandidate.decision == decision).order_by(PolicyCandidate.confidence.desc())).all()
+    return db.scalars(select(PolicyCandidate).join(Source, Source.id == PolicyCandidate.source_id).where(
+        PolicyCandidate.project_id == project_id, PolicyCandidate.decision == decision,
+        Source.status == JobStatus.COMPLETED).order_by(PolicyCandidate.confidence.desc())).all()
 
 
 def get_candidate(candidate_id: str, db: Session):
@@ -42,6 +43,8 @@ def get_candidate(candidate_id: str, db: Session):
 def apply_review(candidate: PolicyCandidate, payload: CandidateReview, db: Session, merge: bool) -> Policy:
     if candidate.decision != CandidateDecision.PENDING:
         raise ApplicationError(409, "이미 검토된 후보입니다.")
+    if db.get(Source, candidate.source_id).status != JobStatus.COMPLETED:
+        raise ApplicationError(409, "소스 분석이 완료된 뒤 정책 후보를 검토해 주세요.")
     version = db.get(SourceVersion, candidate.source_id)
     if version and (payload.target_policy_id or candidate.proposed_policy_id):
         try:
@@ -103,5 +106,7 @@ def reject_candidate(candidate_id: str, db: Session):
         raise ApplicationError(404, "후보를 찾을 수 없습니다.")
     if candidate.decision != CandidateDecision.PENDING:
         raise ApplicationError(409, "이미 검토된 후보입니다.")
+    if db.get(Source, candidate.source_id).status != JobStatus.COMPLETED:
+        raise ApplicationError(409, "소스 분석이 완료된 뒤 정책 후보를 검토해 주세요.")
     candidate.decision, candidate.reviewed_at = CandidateDecision.REJECTED, utc_now_naive()
     db.commit()

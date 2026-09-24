@@ -4,6 +4,7 @@ import zipfile
 from app.domain.clock import utc_now_naive
 from pathlib import Path, PurePosixPath
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -17,6 +18,25 @@ logger = logging.getLogger("uvicorn.error")
 
 LANGUAGES = {".ts": "typescript", ".tsx": "typescript", ".js": "javascript", ".jsx": "javascript", ".kt": "kotlin"}
 IGNORED_PARTS = {"node_modules", "dist", "build", ".git", "vendor", "coverage"}
+
+
+def _stats(selection: dict, total_files: int, processed_files: int, current_file: str | None,
+           current_policy_title: str | None, file_count: int, chunk_count: int,
+           candidate_count: int, ai_count: int, fallback_count: int) -> dict:
+    return {
+        "files": file_count, "chunks": chunk_count, "candidates": candidate_count,
+        "ai_candidates": ai_count, "fallback_candidates": fallback_count, "scope": selection,
+        "total_files": total_files, "processed_files": processed_files,
+        "current_file": current_file, "current_policy_title": current_policy_title,
+    }
+
+
+def _discard_partial_results(db: Session, source_id: str) -> None:
+    file_ids = list(db.scalars(select(SourceFile.id).where(SourceFile.source_id == source_id)))
+    db.execute(delete(PolicyCandidate).where(PolicyCandidate.source_id == source_id))
+    if file_ids:
+        db.execute(delete(SourceChunk).where(SourceChunk.source_file_id.in_(file_ids)))
+        db.execute(delete(SourceFile).where(SourceFile.id.in_(file_ids)))
 
 
 def _safe_zip_files(archive: zipfile.ZipFile):
@@ -65,9 +85,20 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
                 "Code scope selected source_id=%s mode=%s route_entries=%s selected_files=%s ignored_files=%s",
                 source.id, selection["mode"], selection["entries"], selection["selected"], selection["ignored"],
             )
-        for path, raw in documents:
+        total_files = len(documents)
+        current_policy_title = None
+        job.stage = "extract"
+        job.stats = _stats(selection, total_files, 0, None, None, file_count, chunk_count,
+                           candidate_count, ai_count, fallback_count)
+        db.commit()
+        for file_index, (path, raw) in enumerate(documents):
             if Path(path).suffix.lower() != ".xlsx" and b"\x00" in raw[:4096]:
                 continue
+            job.stage = "extract"
+            job.progress = 10 + int(80 * file_index / max(total_files, 1))
+            job.stats = _stats(selection, total_files, file_index, path, current_policy_title, file_count, chunk_count,
+                               candidate_count, ai_count, fallback_count)
+            db.commit()
             text = raw.decode("utf-8", errors="replace")
             suffix = Path(path).suffix.lower()
             language = LANGUAGES.get(suffix, "markdown" if suffix in {".md", ".markdown"} else "xlsx" if suffix == ".xlsx" else "csv")
@@ -79,7 +110,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
             parsed = (parse_code(text) if suffix in LANGUAGES else parse_csv(text) if suffix == ".csv"
                       else parse_xlsx(raw) if suffix == ".xlsx" else parse_markdown(text))
             logger.info("Source file parsed source_id=%s path=%s chunks=%s", source.id, path, len(parsed))
-            for item in parsed:
+            for chunk_index, item in enumerate(parsed):
                 chunk = SourceChunk(source_file_id=source_file.id, project_id=source.project_id, chunk_type=item.kind,
                                     symbol_name=item.symbol_name, document_path=item.document_path, start_line=item.start_line,
                                     end_line=item.end_line, content=item.content, candidate_score=item.score,
@@ -97,12 +128,23 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
                                            proposed_policy_id=suggest_policy(db, source, chunk),
                                            extraction_data={**extraction_metadata, **extracted}, **extracted))
                     candidate_count += 1
+                    current_policy_title = extracted["title"]
+                    source.discovered_policy_count = candidate_count
+                    file_progress = (chunk_index + 1) / max(len(parsed), 1)
+                    job.progress = 10 + int(80 * (file_index + file_progress) / max(total_files, 1))
+                    job.stats = _stats(selection, total_files, file_index, path, current_policy_title,
+                                       file_count, chunk_count, candidate_count, ai_count, fallback_count)
+                    db.commit()
+            job.progress = 10 + int(80 * (file_index + 1) / max(total_files, 1))
+            job.stats = _stats(selection, total_files, file_index + 1, path, current_policy_title,
+                               file_count, chunk_count,
+                               candidate_count, ai_count, fallback_count)
+            db.commit()
         source.discovered_policy_count = candidate_count
         source.status = job.status = JobStatus.COMPLETED
         job.stage, job.progress = "completed", 100
-        job.stats = {"files": file_count, "chunks": chunk_count, "candidates": candidate_count,
-                     "ai_candidates": ai_count, "fallback_candidates": fallback_count,
-                     "scope": selection}
+        job.stats = _stats(selection, total_files, total_files, None, current_policy_title, file_count, chunk_count,
+                           candidate_count, ai_count, fallback_count)
         job.completed_at = utc_now_naive()
         db.commit()
         logger.info(
@@ -112,9 +154,11 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
     except Exception as exc:
         logger.exception("Source analysis failed source_id=%s error_type=%s", source.id, type(exc).__name__)
         db.rollback()
+        _discard_partial_results(db, source.id)
         source = db.get(Source, source.id)
         job = db.get(AnalysisJob, job.id)
         source.status = job.status = JobStatus.FAILED
+        source.discovered_policy_count = 0
         source.error_message = job.error_message = str(exc)
         job.stage = "failed"
         job.completed_at = utc_now_naive()

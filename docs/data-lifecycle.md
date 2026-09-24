@@ -52,13 +52,17 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 ## 분석 상태와 재시작
 
 <!-- doc-check: {"kind":"enum","path":"apps/api/app/domain/job_status.py","symbol":"JobStatus","expected":{"PENDING":"PENDING","PROCESSING":"PROCESSING","COMPLETED":"COMPLETED","FAILED":"FAILED"}} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"292eb7f62c3becab04160974911a73ebc9baae09eb50bc5b282496a110850f14"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"5ea2a5faba493e18061d08ca397a3014a904f66c423490c97caffe00abe74bfe"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"_recover_interrupted_analysis_jobs","sha256":"f05ba3d0a351ad8934d6c4d7975aa2f45a4868cf7ab207701880825d44c76177"} -->
 
 - 새 Source와 Job은 `PENDING`, 실행을 시작하면 `PROCESSING`으로 바꾸고 commit한다.
+- 파일을 처리하는 동안 현재 파일, 처리 파일 수, 전체 파일 수와 진행률을 갱신한다.
+- 후보를 찾을 때마다 제목과 누적 후보를 commit하여 소스 화면의 1초 polling에서 조회할 수 있다.
+- 분석 중 후보는 정책 관리 목록에서 제외하며 승인·병합·반려 API도 409로 거부한다.
 - 파일·chunk·후보 처리가 끝나면 두 상태를 `COMPLETED`로 저장한다.
-- 처리 중 예외가 나면 결과 트랜잭션을 rollback하고 `FAILED` 및 오류를 별도로 저장한다.
-- `progress`는 현재 시작 10, 완료 100으로 기록한다. 파일별 정밀 진행률이 아니다.
+- 처리 중 예외가 나면 실시간 표시를 위해 먼저 commit한 후보·chunk·파일을 삭제하고
+  Source의 발견 수를 0으로 되돌린 뒤 `FAILED`와 오류를 저장한다.
+- 진행률은 파일 수를 기준으로 10~90 사이를 계산하고 완료 시 100으로 기록한다.
 - FastAPI lifespan에서 초기화를 실행하고, 모든 `PENDING`·`PROCESSING` Source와 Job을 `FAILED`로 바꾼다.
 - 현재 작업 큐는 프로세스 내부 BackgroundTasks다. 재시도·작업 재개·실행 보장을 제공하지 않는다.
 - 다중 API 인스턴스에서 다른 인스턴스의 실행 중 작업까지 실패로 바꿀 수 있다.
@@ -66,10 +70,12 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 
 구현: `analysis/pipeline.py`, `main.py`의 `lifespan()`과 `_recover_interrupted_analysis_jobs()`.
 시작 시 초기화는 [FastAPI lifespan 방식](https://fastapi.tiangolo.com/advanced/events/)을 사용한다.
+진행 조회 API는 `GET /sources/{source_id}/analysis`이며 현재 파일·최근 발견 정책과
+누적 후보 목록을 반환한다.
 
 ## 검토와 정책 변경
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"","sha256":"1bd09a169434c296f165d3f4300edcaf108328fdb808879ec47e3e193c1ef277"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"","sha256":"20b93970838984c5286d9d9c7f05531712ea3c5776bbdca1a36904cc80578439"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/application/policies.py","symbol":"update_policy","sha256":"af895c26044cedc82d5c6e72d8a81df29cac96e7eeacda00b5eee56ce91b51cc"} -->
 
 | 작업 | 현재 동작 |

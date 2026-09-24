@@ -65,6 +65,10 @@ def test_review_search_and_evidence_protection(client):
     detail = client.get(f'/policy-candidates/{candidate_id}').json()
     assert detail['source_name'] == 'policy.md'
     assert '취소' in detail['excerpt']
+    progress = client.get(f'/sources/{source_id}/analysis')
+    assert progress.status_code == 200
+    assert progress.json()['progress'] == 100
+    assert progress.json()['candidates'][0]['id'] == candidate_id
     review = {"title": "취소 정책", "summary": "승인 전 취소 가능", "rules": ["승인 전에 취소 가능"]}
     approved = client.post(f'/policy-candidates/{candidate_id}/approve', json=review)
     assert approved.status_code == 200, approved.text

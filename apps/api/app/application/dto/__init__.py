@@ -16,5 +16,6 @@ from app.application.dto.navigation_item import NavigationItem
 from app.application.dto.chat_request import ChatRequest
 from app.application.dto.chat_citation import ChatCitation
 from app.application.dto.chat_response import ChatResponse
+from app.application.dto.source_analysis_out import SourceAnalysisOut
 
-__all__ = ['ORMModel', 'ProjectCreate', 'ProjectOut', 'DashboardOut', 'SourceOut', 'SourceRoleUpdate', 'JobOut', 'CandidateOut', 'CandidateDetail', 'CandidateReview', 'RuleOut', 'EvidenceOut', 'PolicyOut', 'PolicyUpdate', 'NavigationItem', 'ChatRequest', 'ChatCitation', 'ChatResponse']
+__all__ = ['ORMModel', 'ProjectCreate', 'ProjectOut', 'DashboardOut', 'SourceOut', 'SourceRoleUpdate', 'JobOut', 'CandidateOut', 'CandidateDetail', 'CandidateReview', 'RuleOut', 'EvidenceOut', 'PolicyOut', 'PolicyUpdate', 'NavigationItem', 'ChatRequest', 'ChatCitation', 'ChatResponse', 'SourceAnalysisOut']

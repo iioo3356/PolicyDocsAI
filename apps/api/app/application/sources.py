@@ -4,7 +4,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.infrastructure.models import AnalysisJob, JobStatus, PolicyCandidate, PolicyEvidence, Source, SourceChunk, SourceFile, SourceKind, SourceVersion
-from app.application.dto import SourceRoleUpdate
+from app.application.dto import SourceAnalysisOut, SourceRoleUpdate
 from app.domain.application_error import ApplicationError
 from app.domain.source_role import normalize_source_role
 
@@ -111,3 +111,22 @@ def get_job(job_id: str, db: Session):
     if not job:
         raise ApplicationError(404, "분석 작업을 찾을 수 없습니다.")
     return job
+
+
+def analysis_progress(source_id: str, db: Session) -> SourceAnalysisOut:
+    source = db.get(Source, source_id)
+    if not source:
+        raise ApplicationError(404, "Source를 찾을 수 없습니다.")
+    job = db.scalar(select(AnalysisJob).where(AnalysisJob.source_id == source_id)
+                    .order_by(AnalysisJob.created_at.desc()).limit(1))
+    if not job:
+        raise ApplicationError(404, "분석 작업을 찾을 수 없습니다.")
+    stats = job.stats or {}
+    candidates = list(db.scalars(select(PolicyCandidate).where(PolicyCandidate.source_id == source_id)
+                                 .order_by(PolicyCandidate.created_at)))
+    return SourceAnalysisOut(
+        source_id=source.id, status=job.status, stage=job.stage, progress=job.progress,
+        current_file=stats.get('current_file'), current_policy_title=stats.get('current_policy_title'),
+        processed_files=stats.get('processed_files', 0), total_files=stats.get('total_files', 0),
+        candidates=candidates,
+    )
