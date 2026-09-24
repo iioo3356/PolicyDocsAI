@@ -28,6 +28,41 @@ def test_code_only_keeps_policy_like_windows():
     assert extract_candidate(chunks[0], "apply.ts") is not None
 
 
+def test_code_rejects_presentation_and_transport_mechanics():
+    source = """if (isModalOpen) {
+ history.back()
+}
+if (!response.ok) {
+ throw Error('request failed')
+}"""
+    assert parse_code(source) == []
+
+
+def test_code_does_not_mix_adjacent_policy_text_into_ui_condition():
+    source = """const help = '구매 금액 제한은 10만원입니다'
+if (isModalOpen) {
+ history.back()
+}"""
+    assert parse_code(source, ".tsx") == []
+
+
+def test_code_keeps_enforced_business_constraints():
+    source = """if (order.status === 'SHIPPED') {
+ throw Error('배송 후 취소 불가')
+}
+if (image.fileSize > 10 * MB) {
+    throw Error('이미지 파일 크기는 10MB 이하여야 합니다')
+}"""
+    chunks = parse_code(source)
+    assert len(chunks) == 2
+    assert all(chunk.metadata["business_signal_score"] >= 3 for chunk in chunks)
+
+
+def test_code_keeps_standalone_business_validation_call():
+    chunks = parse_code("require(order.amount <= 100000, '주문 금액 한도 초과')")
+    assert len(chunks) == 1
+
+
 def test_llm_interpretation_becomes_korean_policy(monkeypatch):
     chunk = parse_code("if (order.status === 'SHIPPED') {\n throw Error('취소 불가')\n}")[0]
     monkeypatch.setattr(extractor.settings, "llm_api_key", "test-key")

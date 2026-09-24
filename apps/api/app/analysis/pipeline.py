@@ -107,7 +107,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
             db.add(source_file)
             db.flush()
             file_count += 1
-            parsed = (parse_code(text) if suffix in LANGUAGES else parse_csv(text) if suffix == ".csv"
+            parsed = (parse_code(text, suffix) if suffix in LANGUAGES else parse_csv(text) if suffix == ".csv"
                       else parse_xlsx(raw) if suffix == ".xlsx" else parse_markdown(text))
             logger.info("Source file parsed source_id=%s path=%s chunks=%s", source.id, path, len(parsed))
             for chunk_index, item in enumerate(parsed):

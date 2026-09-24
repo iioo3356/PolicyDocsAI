@@ -1,9 +1,11 @@
 import csv
 import io
 import re
+from tree_sitter_language_pack import get_parser
 
 
 from app.domain.parsed_chunk import ParsedChunk
+from app.domain.business_policy_signal import business_policy_score, is_business_policy_code
 
 
 POLICY_MARKERS = re.compile(
@@ -12,6 +14,9 @@ POLICY_MARKERS = re.compile(
     r"(권한|상태|취소|지원|신청|승인|포인트|금액|기간|가능|불가)",
     re.IGNORECASE,
 )
+LANGUAGE_BY_SUFFIX = {".ts": "typescript", ".tsx": "tsx", ".js": "javascript", ".jsx": "tsx", ".kt": "kotlin"}
+DECISION_NODES = {"if_statement", "switch_statement", "ternary_expression", "if_expression", "when_expression"}
+VALIDATION_CALL = re.compile(r"^(require|check|validate|assert|invariant)$", re.IGNORECASE)
 
 
 def parse_markdown(text: str) -> list[ParsedChunk]:
@@ -87,20 +92,38 @@ def parse_xlsx(raw: bytes) -> list[ParsedChunk]:
     return result
 
 
-def parse_code(text: str) -> list[ParsedChunk]:
-    lines = text.splitlines()
-    interesting = [i for i, line in enumerate(lines) if POLICY_MARKERS.search(line)]
-    windows: list[tuple[int, int]] = []
-    for index in interesting:
-        start, end = max(0, index - 4), min(len(lines), index + 8)
-        if windows and start <= windows[-1][1]:
-            windows[-1] = (windows[-1][0], max(windows[-1][1], end))
-        else:
-            windows.append((start, end))
+def _decision_blocks(text: str, suffix: str) -> list[tuple[int, int, str]]:
+    source = text.encode("utf-8")
+    parser = get_parser(LANGUAGE_BY_SUFFIX.get(suffix, "typescript"))
+    root = parser.parse(source).root_node
+    blocks = []
+    pending = [root]
+    while pending:
+        node = pending.pop()
+        if node.type in DECISION_NODES:
+            blocks.append((node.start_point[0] + 1, node.end_point[0] + 1,
+                           source[node.start_byte:node.end_byte].decode("utf-8", errors="replace")))
+            continue
+        if node.type == "call_expression":
+            function = node.child_by_field_name("function")
+            name = source[function.start_byte:function.end_byte].decode() if function else ""
+            if VALIDATION_CALL.fullmatch(name.rsplit(".", 1)[-1]):
+                parent = node.parent if node.parent and node.parent.type == "expression_statement" else node
+                blocks.append((parent.start_point[0] + 1, parent.end_point[0] + 1,
+                               source[parent.start_byte:parent.end_byte].decode("utf-8", errors="replace")))
+                continue
+        pending.extend(reversed(node.children))
+    return blocks
+
+
+def parse_code(text: str, suffix: str = ".ts") -> list[ParsedChunk]:
     chunks = []
-    for start, end in windows:
-        content = "\n".join(lines[start:end]).strip()
+    for start_line, end_line, content in _decision_blocks(text, suffix):
+        if not is_business_policy_code(content):
+            continue
         marker_count = len(POLICY_MARKERS.findall(content))
-        score = min(0.95, 0.45 + marker_count * 0.08)
-        chunks.append(ParsedChunk("code", content, start + 1, end, score=score))
+        signal_score = business_policy_score(content)
+        score = min(0.95, 0.48 + marker_count * 0.05 + signal_score * 0.04)
+        chunks.append(ParsedChunk("code", content.strip(), start_line, end_line, score=score,
+                                  metadata={"business_signal_score": signal_score}))
     return chunks

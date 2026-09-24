@@ -8,7 +8,7 @@
 
 ## 우선 확인: 데이터와 입력 처리
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"5ea2a5faba493e18061d08ca397a3014a904f66c423490c97caffe00abe74bfe"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"636ef5572128b29cee930eb2d987d701869195f8f9b6ec0b772274670d8b1c58"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"reject_candidate","sha256":"1636c23729ec9bfcf0d26d0ef40274c7295161531b8ad946d3fdd389acbf6c1e"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/application/candidates.py","symbol":"apply_review","sha256":"90a5cda18f622914819683308d930e2900aff13cd5b24d8472a8aea4bac3a205"} -->
 
@@ -23,6 +23,8 @@
 
 분석 중 진행률과 발견 후보는 파일·후보 단위 commit과 조회 API로 제공한다.
 실패 시 부분 결과 삭제는 `apps/api/tests/test_analysis_progress.py`에서 검증한다.
+코드 후보는 업무 결과·제한과 분기·검증의 조합으로 사전 선별한다.
+UI 탐색·표시만 있는 코드의 제외와 업무 제한 보존은 `apps/api/tests/test_parsers.py`에서 검증한다.
 
 ## 운영 확장 전에 처리
 

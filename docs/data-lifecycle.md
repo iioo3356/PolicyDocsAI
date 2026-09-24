@@ -52,10 +52,16 @@ DB 스키마를 바꿀 때는 외래 키와 삭제 순서, 응답 DTO를 함께 
 ## 분석 상태와 재시작
 
 <!-- doc-check: {"kind":"enum","path":"apps/api/app/domain/job_status.py","symbol":"JobStatus","expected":{"PENDING":"PENDING","PROCESSING":"PROCESSING","COMPLETED":"COMPLETED","FAILED":"FAILED"}} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"5ea2a5faba493e18061d08ca397a3014a904f66c423490c97caffe00abe74bfe"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/pipeline.py","symbol":"run_analysis","sha256":"636ef5572128b29cee930eb2d987d701869195f8f9b6ec0b772274670d8b1c58"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/analysis/parsers.py","symbol":"parse_code","sha256":"361a7ef7446f90c5116285ae15383e1079beeadedfca3bb430d0da24bc086100"} -->
+<!-- doc-check: {"kind":"review","path":"apps/api/app/domain/business_policy_signal.py","symbol":"business_policy_score","sha256":"5fdc893af875767567a751824191ff57f27169764b8b7425f63ca688110582a7"} -->
 <!-- doc-check: {"kind":"review","path":"apps/api/app/main.py","symbol":"_recover_interrupted_analysis_jobs","sha256":"f05ba3d0a351ad8934d6c4d7975aa2f45a4868cf7ab207701880825d44c76177"} -->
 
 - 새 Source와 Job은 `PENDING`, 실행을 시작하면 `PROCESSING`으로 바꾸고 commit한다.
+- AST에서 실제 조건문·상태 분기·삼항식·검증 호출을 각각 분리한다.
+- 분리된 코드 구간은 분기·검증과 업무 결과·제한 신호가 함께 있어야 후보가 된다.
+  화면 표시·탐색·스타일만 제어하는 구간은 LLM 호출 전에 제외한다.
+- 컴포넌트 경로 자체를 제외하지 않으므로 UI 코드 안의 취소·결제·자격·파일 제한은 분석할 수 있다.
 - 파일을 처리하는 동안 현재 파일, 처리 파일 수, 전체 파일 수와 진행률을 갱신한다.
 - 후보를 찾을 때마다 제목과 누적 후보를 commit하여 소스 화면의 1초 polling에서 조회할 수 있다.
 - 분석 중 후보는 정책 관리 목록에서 제외하며 승인·병합·반려 API도 409로 거부한다.
