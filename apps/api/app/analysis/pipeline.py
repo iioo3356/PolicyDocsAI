@@ -1,14 +1,14 @@
 import hashlib
 import logging
-import shutil
 import zipfile
-from datetime import datetime
+from app.domain.clock import utc_now_naive
 from pathlib import Path, PurePosixPath
 
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models import AnalysisJob, JobStatus, PolicyCandidate, Source, SourceChunk, SourceFile
+from app.application.source_versions import suggest_policy
 from .extractor import extract_candidate_with_metadata
 from .parsers import parse_code, parse_csv, parse_markdown, parse_xlsx
 from .reachability import select_reachable_react_files
@@ -66,7 +66,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
                 source.id, selection["mode"], selection["entries"], selection["selected"], selection["ignored"],
             )
         for path, raw in documents:
-            if b"\x00" in raw[:4096]:
+            if Path(path).suffix.lower() != ".xlsx" and b"\x00" in raw[:4096]:
                 continue
             text = raw.decode("utf-8", errors="replace")
             suffix = Path(path).suffix.lower()
@@ -94,6 +94,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
                     else:
                         fallback_count += 1
                     db.add(PolicyCandidate(project_id=source.project_id, source_id=source.id, source_chunk_id=chunk.id,
+                                           proposed_policy_id=suggest_policy(db, source, chunk),
                                            extraction_data={**extraction_metadata, **extracted}, **extracted))
                     candidate_count += 1
         source.discovered_policy_count = candidate_count
@@ -102,7 +103,7 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
         job.stats = {"files": file_count, "chunks": chunk_count, "candidates": candidate_count,
                      "ai_candidates": ai_count, "fallback_candidates": fallback_count,
                      "scope": selection}
-        job.completed_at = datetime.utcnow()
+        job.completed_at = utc_now_naive()
         db.commit()
         logger.info(
             "Source analysis completed source_id=%s files=%s chunks=%s candidates=%s ai_candidates=%s fallback_candidates=%s",
@@ -116,5 +117,5 @@ def run_analysis(db: Session, source: Source, job: AnalysisJob) -> None:
         source.status = job.status = JobStatus.FAILED
         source.error_message = job.error_message = str(exc)
         job.stage = "failed"
-        job.completed_at = datetime.utcnow()
+        job.completed_at = utc_now_naive()
         db.commit()

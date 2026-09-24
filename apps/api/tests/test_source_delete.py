@@ -1,4 +1,5 @@
-from fastapi import HTTPException
+from app.domain.application_error import ApplicationError
+from app.application.sources import delete_source
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
@@ -11,10 +12,14 @@ from app.models import (
 )
 
 
+@pytest.fixture
 def database():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    return engine
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 def source_graph(db: Session, storage_key: str) -> tuple[Source, SourceChunk]:
@@ -37,16 +42,16 @@ def source_graph(db: Session, storage_key: str) -> tuple[Source, SourceChunk]:
     return source, chunk
 
 
-def test_delete_source_removes_records_and_stored_file(tmp_path, monkeypatch):
+def test_delete_source_removes_records_and_stored_file(tmp_path, monkeypatch, database):
     monkeypatch.setattr(main.settings, "storage_path", tmp_path)
     stored_file = tmp_path / "project" / "code.zip"
     stored_file.parent.mkdir()
     stored_file.write_bytes(b"zip")
 
-    with Session(database()) as db:
+    with Session(database) as db:
         source, _ = source_graph(db, "project/code.zip")
         source_id = source.id
-        main.delete_source(source_id, db)
+        delete_source(source_id, db)
 
         assert db.get(Source, source_id) is None
         assert db.scalar(select(func.count()).select_from(SourceFile)) == 0
@@ -55,9 +60,9 @@ def test_delete_source_removes_records_and_stored_file(tmp_path, monkeypatch):
         assert not stored_file.exists()
 
 
-def test_delete_source_preserves_approved_policy_evidence(tmp_path, monkeypatch):
+def test_delete_source_preserves_approved_policy_evidence(tmp_path, monkeypatch, database):
     monkeypatch.setattr(main.settings, "storage_path", tmp_path)
-    with Session(database()) as db:
+    with Session(database) as db:
         source, chunk = source_graph(db, "project/code.zip")
         policy = Policy(project_id=source.project_id, title="정책", summary="요약", category="테스트",
                         status=PolicyStatus.APPROVED)
@@ -68,15 +73,15 @@ def test_delete_source_preserves_approved_policy_evidence(tmp_path, monkeypatch)
                               excerpt=chunk.content, extracted_claim="테스트 정책", confidence=0.9))
         db.commit()
 
-        with pytest.raises(HTTPException) as error:
-            main.delete_source(source.id, db)
+        with pytest.raises(ApplicationError) as error:
+            delete_source(source.id, db)
 
         assert error.value.status_code == 409
         assert db.get(Source, source.id) is not None
 
 
-def test_startup_recovery_marks_interrupted_analysis_as_failed(monkeypatch):
-    engine = database()
+def test_startup_recovery_marks_interrupted_analysis_as_failed(monkeypatch, database):
+    engine = database
     monkeypatch.setattr(main, "engine", engine)
     with Session(engine) as db:
         source, _ = source_graph(db, "project/code.zip")

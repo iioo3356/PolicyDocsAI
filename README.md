@@ -30,7 +30,7 @@ if (order.status === "SHIPPED") {
 - 정책 후보의 제목, 요약, 카테고리, 규칙 편집
 - 후보 승인, 거절 및 기존 정책 병합
 - 승인된 정책과 원본 파일·라인·코드 근거 보존
-- 승인된 정책만 사용하는 근거 제한 Chat
+- 승인된 정책 근거 Chat과 소스 업데이트 안내·승인 후 수정 이력
 - 등록 Source와 미승인 분석 결과 삭제
 - AI 호출, fallback 및 분석 범위 로그 확인
 
@@ -159,7 +159,7 @@ docker compose ps
 5. `Policy Docs`에서 승인된 정책을 확인합니다.
 6. `AI Chat`에서 승인된 정책에 관해 질문합니다.
 
-분석 방식이 변경된 뒤에는 기존 Source가 자동으로 재분석되지 않습니다. Source를 삭제하고 다시 업로드해야 새 분석 방식이 적용됩니다. 승인된 Policy의 근거로 사용 중인 Source는 추적성 보호를 위해 삭제할 수 없습니다.
+정책을 바꾸려면 소스 추가에서 기존 Source를 선택해 최신 파일을 업로드하고 정책 관리에서 변경 전후를 검토·승인하세요. 승인 후 같은 정책에 수정 이력이 남습니다. 기존 소스와 근거는 보존합니다. [소스 업데이트](docs/source-updates.md)
 
 ## 로그 확인
 
@@ -293,4 +293,6 @@ make test
 - 자동 정책 병합과 자연어 conflict 판정은 제공하지 않습니다.
 - 사용자 인증과 조직별 권한 관리는 포함하지 않습니다.
 - 분석 작업은 현재 FastAPI process의 background task로 실행됩니다. 운영 환경에서는 별도 worker가 필요합니다.
-- Chat 검색은 pgvector가 아닌 한국어·영문 token overlap 방식입니다.
+- Chat은 승인 정책으로 답하며 변경 요청에는 관련 소스 업데이트를 안내합니다. [상세](docs/policy-chat.md)
+
+개발 문서: [문서 목록](docs/README.md) · [개발 규칙](docs/development-rules.md)
