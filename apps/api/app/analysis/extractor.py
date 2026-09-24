@@ -3,7 +3,6 @@ import re
 import threading
 import time
 
-from pydantic import BaseModel, Field
 
 from ..config import settings
 from .parsers import ParsedChunk
@@ -13,13 +12,7 @@ _rate_limit_lock = threading.Lock()
 _last_llm_request_at = 0.0
 
 
-class PolicyInterpretation(BaseModel):
-    title: str = Field(min_length=1, max_length=300)
-    summary: str = Field(min_length=1, max_length=1000)
-    category: str = Field(min_length=1, max_length=500)
-    rules: list[str] = Field(min_length=1, max_length=8)
-    confidence: float = Field(ge=0, le=1)
-    warnings: list[str] = Field(default_factory=list, max_length=5)
+from app.infrastructure.policy_interpretation import PolicyInterpretation
 
 
 SYSTEM_PROMPT = """당신은 소프트웨어 코드에서 업무 정책을 추출하는 분석가다.
