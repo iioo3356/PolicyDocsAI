@@ -1,0 +1,1 @@
+export type Policy={id:string;title:string;summary:string;category:string;status:string;confidence:number;has_conflict:boolean;rules:{id:string;content:string}[];evidence:{id:string;source_chunk_id:string;source_type:string;source_name:string;source_path:string;start_line:number;end_line:number;excerpt:string}[]};
