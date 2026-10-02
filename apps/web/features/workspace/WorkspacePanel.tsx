@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 
 export function WorkspacePanel({ title, onClose, children }: {
@@ -20,10 +21,10 @@ export function WorkspacePanel({ title, onClose, children }: {
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="panel-surface">
         <header className="panel-header">
-          <div><span className="section-eyebrow">WORKSPACE</span><h2 id="workspace-panel-title">{title}</h2></div>
-          <button type="button" aria-label="닫고 문서로 돌아가기" onClick={onClose} autoFocus>
+          <div><span className="section-eyebrow type-label">WORKSPACE</span><h2 className="type-heading" id="workspace-panel-title">{title}</h2></div>
+          <Button variant="ghost" size="icon" type="button" aria-label="닫고 문서로 돌아가기" onClick={onClose} autoFocus>
             <WorkspaceIcon name="close" />
-          </button>
+          </Button>
         </header>
         <div className="panel-content">{children}</div>
       </div>

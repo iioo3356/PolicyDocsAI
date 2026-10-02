@@ -62,7 +62,22 @@ source_suggestions는 정책 ID·제목과 업데이트할 소스 ID·이름을 
 
 자동 테스트는 가짜 모델 응답을 사용하며 실제 운영 정책을 외부 모델로 전송하지 않는다.
 
-<!-- doc-check: {"kind":"review","path":"apps/api/app/application/chat.py","symbol":"chat","sha256":"29d48f6a8ccce607fcc4c6d21293f5999bd53fcb566c82a33c225130a7e3be30"} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/application/chat_source_guidance.py","symbol":"source_guidance","sha256":"9c702df649dca9c057dcc267561e7d6210d77794c4d78963167c4a2a400a38f9"} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/presentation/routes/chat.py","symbol":"retired_chat_edit","sha256":"edf64088868a0cc03088b925bc6c866349c9fb8070f38242b731fd44fbdeb2d1"} -->
-<!-- doc-check: {"kind":"review","path":"apps/api/app/infrastructure/chat_llm.py","symbol":"","sha256":"da8865c8b6d78e40b76dabd8776d6d747480d2599ba6aa763c78e068ad51c3ee"} -->
+<!-- doc-check: {"kind": "review", "path": "apps/api/app/application/chat.py", "symbol": "chat", "sha256": "a9734af6d5c9a621e7acf8d4648f017118ee9bb0bf87462f898280fb772a87cd"} -->
+<!-- doc-check: {"kind": "review", "path": "apps/api/app/application/chat_source_guidance.py", "symbol": "source_guidance", "sha256": "9c702df649dca9c057dcc267561e7d6210d77794c4d78963167c4a2a400a38f9"} -->
+<!-- doc-check: {"kind": "review", "path": "apps/api/app/presentation/routes/chat.py", "symbol": "retired_chat_edit", "sha256": "edf64088868a0cc03088b925bc6c866349c9fb8070f38242b731fd44fbdeb2d1"} -->
+<!-- doc-check: {"kind": "review", "path": "apps/api/app/infrastructure/chat_llm.py", "symbol": "", "sha256": "14f68b89bfc6182e5f003655ec6b03ab8171eb9a40e125c46c8836f31e66042f"} -->
+
+## 실시간 응답
+
+- 웹 채팅은 `POST /projects/{project_id}/chat/stream`의 NDJSON 스트림을 읽는다.
+- `delta` 이벤트의 text는 모델이 생성 중인 답변 조각이다. 화면에 즉시 이어 붙인다.
+- `done` 이벤트의 response는 기존 ChatResponse와 같으며 최종 검증 답변으로 교체한다.
+- 근거와 관련 정책·소스 링크는 완료 후 표시한다. 생성 중 텍스트는 아직 검증 전이다.
+- 모델 출력은 JSON 구조를 유지하며 answer 문자열만 점진적으로 표시한다.
+- 모델 실패·잘못된 출력·근거 불일치 시 임시 답변을 최종 fallback 또는 안내로 교체한다.
+- 연결이 완료 이벤트 없이 끊기면 실패로 표시하고 질문을 보존해 재시도할 수 있다.
+- 패널을 닫으면 브라우저 요청을 취소한다. 서버 모델 스트림도 닫고 DB 세션을 정리한다.
+- API 키가 없거나 로컬 안내인 경우 생성 과정 없이 done 이벤트로 바로 전달한다.
+- 일반 JSON 응답 API는 호환성을 위해 유지한다.
+- 스트림 시작 전 프로젝트·대상 정책·요청을 검증하고 404·422 상태 코드를 유지한다.
+- 스트리밍 회귀 테스트: `apps/api/tests/test_chat_stream.py`.

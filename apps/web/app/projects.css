@@ -1,0 +1,52 @@
+@layer legacy {
+.policy-logo { display: inline-flex; align-items: center; gap: 18px; color: var(--primary); }
+.policy-logo-mark { width: 64px; height: 64px; flex-shrink: 0; }
+.policy-logo-wordmark { color: var(--ink); text-align: left; font-size: 34px; font-weight: 650; letter-spacing: -1.3px; line-height: 1.2; }
+.policy-logo-caption { display: block; margin-top: 9px; font-size: 9px; font-weight: 500; letter-spacing: 2.4px; color: #92928f; }
+.policy-logo-compact { gap: 12px; }
+.policy-logo-compact .policy-logo-mark { width: 38px; height: 38px; }
+.policy-logo-compact .policy-logo-wordmark { font-size: 18px; letter-spacing: -.6px; }
+.policy-logo-compact .policy-logo-caption { font-size: 8px; margin-top: 5px; letter-spacing: 1.7px; }
+.projects-home { min-height: 100dvh; background: #fcfbf8; padding: 100px 24px 32px; }
+.projects-home-content { max-width: 600px; margin: 0 auto; }
+.projects-brand { text-align: center; margin-bottom: 64px; }
+.projects-brand h1 { margin: 0; }
+.projects-brand > p { color: #92928f; font-size: 13px; margin-top: 22px; }
+.projects-section-heading { display: flex; justify-content: space-between; align-items: center; padding: 0 4px 16px; border-bottom: 1px solid #eae8e2; }
+.projects-section-heading h2 { margin: 0; font-size: 13px; font-weight: 600; color: #77756f; }
+.projects-section-heading > span { color: #96958e; font-size: 9px; letter-spacing: 1.4px; }
+.projects-list { display: grid; gap: 10px; padding-top: 16px; }
+.project-link { display: flex; align-items: center; gap: 16px; background: #fffefa; border: 1px solid #eae8e2; border-radius: 12px; padding: 20px; transition: border-color .15s, box-shadow .15s; }
+.project-link:hover { border-color: #c7c5f4; box-shadow: 0 4px 20px #4f46e508; }
+.project-icon { display: grid; place-items: center; width: 44px; height: 44px; background: var(--accent); color: var(--primary); border-radius: 12px; flex-shrink: 0; }
+.project-details { flex: 1; min-width: 0; }
+.project-details strong { display: block; font-size: 15px; font-weight: 600; overflow-wrap: break-word; }
+.project-details > span { display: block; margin-top: 6px; font-size: 12px; color: #92928f; overflow-wrap: break-word; white-space: pre-wrap; }
+.project-arrow { color: #a7a399; flex-shrink: 0; }
+.project-link:hover .project-arrow { color: var(--primary); }
+.projects-state { padding: 40px 12px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; font-size: 13px; color: #92928f; }
+.projects-state h3 { color: var(--ink); font-size: 16px; font-weight: 500; margin-top: 8px; }
+.projects-state p { margin: 0; line-height: 1.8; }
+.projects-create { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 28px; }
+.projects-create > p { margin: 0; font-size: 11px; color: #a09a92; text-align: center; }
+.projects-footer { padding-top: 72px; text-align: center; color: #b6b0a7; font-size: 8px; letter-spacing: 1.6px; }
+.project-dialog { width: min(460px, calc(100vw - 32px)); margin: auto; border: 1px solid #eae8e2; border-radius: 18px; background: #fcfbf8; padding: 28px; max-height: calc(100dvh - 40px); overflow-y: auto; box-shadow: 0 28px 100px #27221d33; }
+.project-dialog::backdrop { background: #28231b4d; backdrop-filter: blur(4px); }
+.project-dialog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.project-dialog h2 { font-size: 23px; font-weight: 600; margin: 0; }
+.project-dialog > p { font-size: 12px; color: #92928f; line-height: 1.8; margin: 12px 0 24px; }
+.project-dialog label { font-size: 12px; margin: 18px 0 8px; }
+.project-dialog label > span { color: var(--primary); }
+.project-dialog label .optional-label { color: #a09a92; margin-left: 5px; font-weight: 400; font-size: 10px; }
+.project-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 28px; }
+.project-error { color: var(--destructive); font-size: 12px; margin-top: 12px; }
+@media (max-width: 650px) {
+  .projects-home { padding: 64px 20px 28px; }
+  .projects-brand { margin-bottom: 44px; }
+  .policy-logo-mark { width: 54px; height: 54px; }
+  .policy-logo-wordmark { font-size: 29px; }
+  .project-link { padding: 16px; gap: 12px; }
+  .project-dialog { padding: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .project-link { transition: none; } }
+}

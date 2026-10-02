@@ -1,0 +1,19 @@
+/* Six shared scales; color and weight belong to each element's role. */
+@utility type-title {
+  @apply text-3xl tracking-tight leading-snug;
+}
+@utility type-heading {
+  @apply text-xl tracking-tight leading-normal;
+}
+@utility type-subheading {
+  @apply text-base tracking-normal leading-normal;
+}
+@utility type-body {
+  @apply text-sm tracking-normal leading-7;
+}
+@utility type-caption {
+  @apply text-xs tracking-normal leading-5;
+}
+@utility type-label {
+  @apply text-[10px] tracking-widest leading-4;
+}

@@ -31,11 +31,16 @@ def fallback(db: Session, project_id: str, payload: ChatRequest, unavailable: bo
                         citations=citations_for(db, selected))
 
 
-def chat(project_id: str, payload: ChatRequest, db: Session) -> ChatResponse:
+def validate_request(project_id: str, payload: ChatRequest, db: Session):
     require_project(db, project_id)
     policies = list(db.scalars(policy_query().where(Policy.project_id == project_id, Policy.status == PolicyStatus.APPROVED)))
     if payload.policy_id and not any(p.id == payload.policy_id for p in policies):
         raise ApplicationError(404, '이 프로젝트의 승인된 정책을 선택해 주세요.')
+    return policies
+
+
+def generate_chat(project_id: str, payload: ChatRequest, db: Session, streaming: bool = False):
+    policies = validate_request(project_id, payload, db)
     if not policies:
         return reply('승인된 정책이 없습니다. 정책 관리에서 후보를 먼저 승인해 주세요.')
     if requests_policy_edit(payload.question):
@@ -54,7 +59,7 @@ def chat(project_id: str, payload: ChatRequest, db: Session) -> ChatResponse:
     # Do not retain a database transaction during a remote model call.
     db.rollback()
     try:
-        decision = chat_llm.decide(payload, context)
+        decision = (yield from chat_llm.stream_decide(payload, context)) if streaming else chat_llm.decide(payload, context)
     except Exception as exc:
         logger.warning('Policy chat unavailable error_type=%s', type(exc).__name__)
         return fallback(db, project_id, payload, True)
@@ -79,3 +84,32 @@ def chat(project_id: str, payload: ChatRequest, db: Session) -> ChatResponse:
     note = '\n관련 정책에 해결되지 않은 충돌이 있습니다.' if any(p.has_conflict for p in current) else ''
     return ChatResponse(answer=decision.answer + note, grounded=True, related_policies=current,
                         citations=citations_for(db, current))
+
+
+def chat(project_id: str, payload: ChatRequest, db: Session) -> ChatResponse:
+    generator = generate_chat(project_id, payload, db)
+    try:
+        next(generator)
+    except StopIteration as finished:
+        return finished.value
+    finally:
+        generator.close()
+    raise RuntimeError('Unexpected streaming result')
+
+
+def stream_chat(project_id: str, payload: ChatRequest, bind):
+    with Session(bind) as db:
+        generator = generate_chat(project_id, payload, db, streaming=True)
+        try:
+            while True:
+                try:
+                    delta = next(generator)
+                except StopIteration as finished:
+                    yield {'type': 'done', 'response': finished.value.model_dump(mode='json')}
+                    return
+                yield {'type': 'delta', 'text': delta}
+        except Exception:
+            logger.exception('Policy chat stream failed')
+            yield {'type': 'error', 'message': '응답이 중단되었습니다. 다시 질문해 주세요.'}
+        finally:
+            generator.close()

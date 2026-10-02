@@ -38,7 +38,8 @@ export function Workspace({ projectId, section }: { projectId: string; section: 
       <Docs key={projectId} id={projectId} projectName={project.data?.name ?? "불러오는 중…"} />
       <nav className="floating-tools" aria-label="문서 도구">
         {actions.map(item => <Link key={item.section} href={`/projects/${projectId}/${item.section}`}
-          scroll={false} aria-label={item.title} aria-haspopup="dialog">
+          scroll={false} aria-label={item.title} aria-haspopup="dialog"
+          aria-current={section === item.section ? "page" : undefined}>
           <WorkspaceIcon name={item.icon} /><span>{item.label}</span>
         </Link>)}
       </nav>

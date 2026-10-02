@@ -4,6 +4,7 @@ import time
 from app.config import settings
 from app.application.dto.chat_request import ChatRequest
 from .chat_decision import ChatDecision
+from app.domain.partial_json_answer import partial_answer
 
 _lock = threading.Lock()
 _last_request = 0.0
@@ -20,7 +21,7 @@ answer일 때 실제 근거로 쓴 policy_ids만 반환한다. 근거가 부족�
 '''
 
 
-def decide(payload: ChatRequest, policies: list[dict]) -> ChatDecision:
+def request_completion(payload: ChatRequest, policies: list[dict], stream: bool = False):
     from litellm import completion
     global _last_request
     with _lock:
@@ -28,7 +29,7 @@ def decide(payload: ChatRequest, policies: list[dict]) -> ChatDecision:
         if delay:
             time.sleep(delay)
         _last_request = time.monotonic()
-    response = completion(
+    return completion(
         model=settings.llm_model, api_key=settings.llm_api_key,
         messages=[{'role': 'system', 'content': SYSTEM_PROMPT}, {'role': 'user', 'content': json.dumps({
             'question': payload.question, 'history': [turn.model_dump() for turn in payload.history],
@@ -38,10 +39,38 @@ def decide(payload: ChatRequest, policies: list[dict]) -> ChatDecision:
         response_format={'type': 'json_schema', 'json_schema': {
             'name': 'policy_chat', 'strict': True, 'schema': ChatDecision.model_json_schema(),
         }},
-        timeout=settings.llm_timeout_seconds, num_retries=1,
+        timeout=settings.llm_timeout_seconds, num_retries=1, stream=stream,
         **({'api_base': settings.llm_api_base} if settings.llm_api_base else {}),
     )
+
+
+def decide(payload: ChatRequest, policies: list[dict]) -> ChatDecision:
+    response = request_completion(payload, policies)
     content = response.choices[0].message.content
     if not content:
         raise ValueError('Empty chat response')
     return ChatDecision.model_validate_json(content)
+
+
+def stream_decide(payload: ChatRequest, policies: list[dict]):
+    response = request_completion(payload, policies, stream=True)
+    content = ''
+    emitted = ''
+    try:
+        for chunk in response:
+            if not chunk.choices:
+                continue
+            content += chunk.choices[0].delta.content or ''
+            if len(content) > 100000:
+                raise ValueError('Chat response too large')
+            answer = partial_answer(content)
+            if not answer.startswith(emitted):
+                raise ValueError('Non-monotonic chat response')
+            if answer != emitted:
+                yield answer[len(emitted):]
+                emitted = answer
+        return ChatDecision.model_validate_json(content)
+    finally:
+        close = getattr(response, 'close', None)
+        if close:
+            close()
